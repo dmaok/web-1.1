@@ -12,7 +12,8 @@ func TestUserRepository_Create(t *testing.T) {
 	defer teardown("users")
 
 	u, err := s.User().Create(&model.User{
-		Email: "test@mail.com",
+		Email:    "test@mail.com",
+		Password: "valid_password",
 	})
 
 	assert.NoError(t, err)
@@ -28,9 +29,10 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 
 	assert.Error(t, err)
 
-	if _, err := s.User().Create(&model.User{
-		Email: email,
-	}); err != nil {
+	testUser := model.TestUser(t)
+	testUser.Email = email
+
+	if _, err := s.User().Create(testUser); err != nil {
 		t.Fatal(err)
 	}
 
