@@ -1,74 +1,41 @@
 package apiserver
 
 import (
-	"github.com/dmaok/web-1.1/internal/app/store"
-	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
-	"io"
+	"database/sql"
+	"github.com/dmaok/web-1.1/internal/app/store/sqlstore"
+	"log"
 	"net/http"
 )
 
-type APIServer struct {
-	config *Config
-	logger *logrus.Logger
-	router *mux.Router
-	store  *store.Store
-}
-
-func New(config *Config) *APIServer {
-	return &APIServer{
-		config: config,
-		logger: logrus.New(),
-		router: mux.NewRouter(),
-	}
-}
-
-func (s *APIServer) Start() error {
-	if err := s.configureLogger(); err != nil {
-		return err
-	}
-
-	s.configureRouter()
-
-	if err := s.configureStore(); err != nil {
-		return err
-	}
-	s.logger.Info("starting api server...")
-
-	return http.ListenAndServe(s.config.BindAddr, s.router)
-}
-
-func (s *APIServer) configureLogger() error {
-	level, err := logrus.ParseLevel(s.config.LogLevel)
+func Start(config *Config) error {
+	db, err := newDB(config.DatabaseUrl)
 
 	if err != nil {
 		return err
 	}
 
-	logrus.SetLevel(level)
-	return nil
-}
-
-func (s *APIServer) configureRouter() {
-	s.router.HandleFunc("/hello", s.HandleHello())
-}
-
-func (s *APIServer) HandleHello() http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
-		_, err := io.WriteString(writer, "Hello Golang!")
-		if err != nil {
-			s.logger.Error(err)
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatal(err)
 		}
-	}
+	}()
+
+	store := sqlstore.New(db)
+	server := newServer(store)
+
+	return http.ListenAndServe(config.BindAddr, server)
 }
 
-func (s APIServer) configureStore() error {
-	st := store.New(s.config.Store)
+func newDB(databaseUrl string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", databaseUrl)
 
-	if err := st.Open(); err != nil {
-		return err
+	if err != nil {
+		return nil, err
 	}
 
-	s.store = st
-	return nil
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
