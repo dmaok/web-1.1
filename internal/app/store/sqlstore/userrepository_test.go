@@ -1,38 +1,38 @@
-package store_test
+package sqlstore_test
 
 import (
 	"github.com/dmaok/web-1.1/internal/app/model"
 	"github.com/dmaok/web-1.1/internal/app/store"
+	"github.com/dmaok/web-1.1/internal/app/store/sqlstore"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestUserRepository_Create(t *testing.T) {
-	s, teardown := store.TestStore(t, databaseUrl)
+	db, teardown := sqlstore.TestDB(t, databaseUrl)
 	defer teardown("users")
 
-	u, err := s.User().Create(&model.User{
-		Email:    "test@mail.com",
-		Password: "valid_password",
-	})
+	s := sqlstore.New(db)
+	u := model.TestUser(t)
 
-	assert.NoError(t, err)
+	assert.NoError(t, s.User().Create(u))
 	assert.NotNil(t, u)
 }
 
 func TestUserRepository_FindByEmail(t *testing.T) {
-	s, teardown := store.TestStore(t, databaseUrl)
+	db, teardown := sqlstore.TestDB(t, databaseUrl)
 	defer teardown("users")
 
+	s := sqlstore.New(db)
 	email := "test@mail.com"
 	_, err := s.User().FindByEmail(email)
 
-	assert.Error(t, err)
+	assert.EqualError(t, err, store.ErrRecordNotFound.Error())
 
 	testUser := model.TestUser(t)
 	testUser.Email = email
 
-	if _, err := s.User().Create(testUser); err != nil {
+	if err := s.User().Create(testUser); err != nil {
 		t.Fatal(err)
 	}
 
